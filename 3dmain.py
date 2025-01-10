@@ -1,148 +1,112 @@
 import pygame
 from pygame.locals import *
-from OpenGL.GL import *
-from OpenGL.GLU import *
 import numpy as np
 from pygame import mixer
+from pydub import AudioSegment
+import yt_dlp
+import os
+import time
+from graphics import *
+
+from yt_dlp import YoutubeDL
+
+
+
+
+def download_song(link):
+    option = {'final_ext': 'mp3',
+              'format': 'bestaudio/best',
+              'postprocessors': [{'key': 'FFmpegExtractAudio',
+                                  'nopostoverwrites': False,
+                                  'preferredcodec': 'mp3',
+                                  'preferredquality': '5'}],
+              'outtmpl': 'song.%(ext)s',
+              'ffmpeg_location': '/usr/local/bin/ffmpeg'}
+    try:
+        print("Downloading Song")
+        with yt_dlp.YoutubeDL(option) as ydl:
+            ydl.download([link])
+    except:
+        print(Exception)
+        pass
+
+if not os.path.exists("song.mp3"):
+    download_song("https://www.youtube.com/watch?v=jCTnF1ACYlk")
 
 # Initialize pygame and sound
 pygame.init()
 mixer.init()
+
+# Load the song at the beginning
+song = mixer.music.load("song.mp3")
 sound = mixer.Sound("jump.wav")
+sound.set_volume(0.05)
+
+# Global variable to track the song's position
+song_position = 0  # This will store the current position in the song in seconds
 
 # Screen dimensions
-width, height = 800, 600
 pygame.display.set_mode((width, height), DOUBLEBUF | OPENGL)
 
-# Adjust the perspective
-gluPerspective(60, (width / height), 0.1, 50.0)
-
-
-# Set up the camera position and view
-
-glLoadIdentity()
-gluPerspective(60, (width / height), 0.1, 50.0)
-glTranslatef(0.0, 0.0, -6.0)
-
-# Enable lighting
-glEnable(GL_LIGHTING)
-glEnable(GL_LIGHT0)  # Main light
-#glClearColor(1.0, 1.0, 1.0, 1.0)
-# Light 0 (main light)
-glLightfv(GL_LIGHT0, GL_POSITION, [5.0, 5.0, 10.0, 1.0])  # Position
-glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.6, 0.6, 0.6, 1.0])    # Diffuse light
-glLightfv(GL_LIGHT0, GL_SPECULAR, [0.8, 0.8, 0.8, 1.0])   # Specular light
-glLightfv(GL_LIGHT0, GL_AMBIENT, [0.2, 0.2, 0.2, 1.0])    # Ambient light
-
-
-# Material properties for the ball
-glMaterialfv(GL_FRONT, GL_DIFFUSE, [1.0, 0.0, 0.0, 1.0])  # Red
-glMaterialfv(GL_FRONT, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])  # Reflective
-glMaterialf(GL_FRONT, GL_SHININESS, 50)  # Shiny
-
-# Ball class
-
+init_graphics()
 
 class Ball:
     def __init__(self):
         self.position = np.array([0.0, 0.0, 0.0])
-        self.velocity = np.array([0.1, -0.1, 0.1])
+        self.velocity = np.array([0.10, -0.10, 0.10])
         self.gravity = np.array([0.0, -0.005, 0.0])
         self.radius = 0.5
-        self.sphere_radius = 2.5
+        self.sphere_radius = 3
+        self.song_position = 0  # Track current position in the song
+        self.last_play_time = 999999
+        self.play_length = 0.3
+        self.curr_play_time = 0
 
+    def play_song_segment(self):
+        """Play a segment of the song for 1 second on each bounce."""
+        current_time = time.time()
+        if not pygame.mixer.music.get_busy():
+            print("START MUSIC")
+            pygame.mixer.Sound.play(sound)
+            pygame.mixer.music.play(loops=0, start=self.song_position)
+            pygame.mixer.music.set_volume(0)
+
+        self.last_play_time = current_time
+    
+    def update_song(self):
+        current_time = time.time()
+
+        if pygame.mixer.music.get_busy():
+            if pygame.mixer.music.get_volume() < 1:
+                pygame.mixer.music.set_volume(pygame.mixer.music.get_volume() + 0.333)
+            
+            if current_time - self.last_play_time >= self.play_length:  # 1 second has passed
+                # Play 1 second of the song
+                current_pos = pygame.mixer.music.get_pos() / 1000.0
+                self.song_position += current_pos
+                pygame.mixer.music.fadeout(25)
+            
     def update(self):
         self.velocity += self.gravity
         self.position += self.velocity
-
+        self.update_song()
+        # Check for collision with the wall (sphere boundary)
         if np.linalg.norm(self.position) + self.radius > self.sphere_radius:
-            pygame.mixer.Sound.play(sound)
             normal = self.position / np.linalg.norm(self.position)
-            penetration = np.linalg.norm(
-                self.position) + self.radius - self.sphere_radius
+            penetration = np.linalg.norm(self.position) + self.radius - self.sphere_radius 
             self.position -= penetration * normal
             self.velocity -= 2 * np.dot(self.velocity, normal) * normal
-
+            self.song_position += self.play_length
+            self.play_song_segment()
+    
     def draw(self):
-        glPushMatrix()
-        glTranslatef(*self.position)
-        quad = gluNewQuadric()
-        gluQuadricNormals(quad, GLU_SMOOTH)
-        gluSphere(quad, self.radius, 64, 64)
-        gluDeleteQuadric(quad)
-        glPopMatrix()
-
-
-def draw_grid():
-    grid_size = 50  # Increase grid size for better visibility
-    grid_step = 1   # Step between grid lines
-
-    # Set grid color to gray
-    glColor3f(0.7, 0.7, 0.7)
-
-    # Draw grid lines along the X and Z axes at the bottom of the sphere (y = -sphere_radius)
-    for x in range(-grid_size, grid_size + 1, grid_step):
-        glBegin(GL_LINES)
-        # Y position adjusted to the bottom of the outer sphere
-        glVertex3f(x, -ball.sphere_radius, -grid_size)
-        # Y position adjusted to the bottom of the outer sphere
-        glVertex3f(x, -ball.sphere_radius, grid_size)
-        glEnd()
-
-    for z in range(-grid_size, grid_size + 1, grid_step):
-        glBegin(GL_LINES)
-        # Y position adjusted to the bottom of the outer sphere
-        glVertex3f(-grid_size, -ball.sphere_radius, z)
-        # Y position adjusted to the bottom of the outer sphere
-        glVertex3f(grid_size, -ball.sphere_radius, z)
-        glEnd()
-
-def draw_glass_sphere(radius):
-    glPushMatrix()
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [0.6, 0.8, 1.0, 0.3])  # Glass
-    quad = gluNewQuadric()
-    gluQuadricNormals(quad, GLU_SMOOTH)
-    gluSphere(quad, radius, 128, 128)
-    gluDeleteQuadric(quad)
-    glDisable(GL_BLEND)
-    glPopMatrix()
-
-
-    # glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.5, 0.5, 0.5, 0.3])  # Specular reflection
-    #   # Shininess for the glass effect
-
-    # glPushMatrix()
-    # glEnable(GL_BLEND)
-    # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    # glDepthMask(GL_FALSE)  # Disable depth writing for transparency
-    # #glDisable(GL_LIGHTING)  # Disable lighting for transparency artifacts
-    # glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [
-    #              0.6, 0.8, 1.0, 0.3])  # Glass material
-    # glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [
-    #              0.2, 0.2, 0.2, 0.2])  # Reduce specular for glass
-    # glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 20)
-    # quad = gluNewQuadric()
-    # gluQuadricNormals(quad, GLU_SMOOTH)
-    # gluSphere(quad, radius, 128, 128)
-    # gluDeleteQuadric(quad)
-    # glEnable(GL_LIGHTING)  # Re-enable lighting
-    # glDepthMask(GL_TRUE)  # Re-enable depth writing
-    # glDisable(GL_BLEND)
-    # glPopMatrix()
-
-
+        draw_small_ball(self.position, self.radius)
+        
 
 # Initialize ball
 ball = Ball()
 
 clock = pygame.time.Clock()
-
-# Initialize transformations (only once)
-#glLoadIdentity()  # Reset the matrix at the start
-#glTranslatef(0.0, 0.0, -12.0)  # Set initial camera position
-# Camera parameters
 
 # Camera parameters
 distance = 8.0  # Distance from the sphere
@@ -170,20 +134,18 @@ while True:
     camera_y = 3.0  # You can modify this for vertical rotation if needed
 
     # Apply the camera translation (moving the camera to the new position)
-    # Translate camera to the new position
-    #glTranslatef(-camera_x, -camera_y, -camera_z)
     gluLookAt(camera_x, camera_y, camera_z,
-          0.0, 0.0, 0.0,
-          0.0, 1.0, 0.0)
-    
+              0.0, 0.0, 0.0,
+              0.0, 1.0, 0.0)
+
     # Draw the background grid
-    draw_grid()
+    draw_grid(ball.sphere_radius)
     # Update and render the ball
     ball.update()
     ball.draw()
 
     # Optionally, render other objects like the glass sphere
-    draw_glass_sphere(ball.sphere_radius)  # Your method to draw glass sphere
+    draw_glass_sphere(ball.sphere_radius)
 
     # Swap buffers to display the rendered frame
     pygame.display.flip()
