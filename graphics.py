@@ -5,11 +5,18 @@ from direct.task import Task
 from procedural3d import *
 
 
-def create_sphere(game_render, position, radius, wireframe=False):
+def create_sphere(game_render:NodePath, position, radius, wireframe=False):
     # Create a small red sphere (diffuse red, specular white)
     sphere = SphereMaker(
         center=position,
         radius=radius,
+        segments={
+            "horizontal": 40,
+            "vertical": 10,
+            "bottom_cap": 3,
+            "top_cap": 3,
+            "slice_caps": 2
+        },
         smooth=True,
         thickness=.1,
         inverted=False,
@@ -18,8 +25,11 @@ def create_sphere(game_render, position, radius, wireframe=False):
     )
     
     sphere = game_render.attach_new_node(sphere.generate())
+    return sphere
     if wireframe:
-        sphere.set_render_mode_filled_wireframe((1., 1., 1., 1.))
+        sphere.set_render_mode_filled_wireframe((1.0, 1.0, 0.941, 1.))
+        sphere.set_render_mode_thickness(2)
+        sphere.set_render_mode_perspective(True)
     return sphere
 
     # def setup_lighting(self):

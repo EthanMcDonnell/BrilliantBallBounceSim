@@ -84,9 +84,9 @@ class Ball:
     # use time=current_time * self.color_change_speed
     def slow_rainbow_color(self, time):
         """Returns a color cycling through the rainbow."""
-        r = abs(sin(time + self.time_offset))
-        g = abs(sin(time + self.time_offset + 2*pi / 3))
-        b = abs(sin(time + self.time_offset + 4*pi / 3))
+        r = abs(sin(2*time + self.time_offset))
+        g = abs(sin(2*time + self.time_offset + 2*pi / 3))
+        b = abs(sin(2*time + self.time_offset + 4*pi / 3))
 
         return (r, g, b)
     
@@ -97,10 +97,11 @@ class Ball:
         b = random.random()  # Random float between 0 and 1
         return (r, g, b)
 
+
     def update_color(self):
         """Updates the ball color to a rainbow effect."""
         current_time = time.perf_counter()
-        rainbow_color = self.random_rainbow_color()
+        rainbow_color = self.slow_rainbow_color(current_time)
 
         # Set the color to the ball's material or rendering
         self.render.set_color(
@@ -176,16 +177,22 @@ class Ball:
 
 
 
+
+
+
+
+
+
 class My3DApp(ShowBase):
     def __init__(self):
         ShowBase.__init__(self)
 
         # Set up the environment
         self.set_background_color(0, 0, 0)  # RGB for black
-        self.axis = self.loader.loadModel('zup-axis')
-        self.axis.reparentTo(self.render)
-        self.axis.setPos(0, 0, 0)
-        self.axis.setScale(1)
+        # self.axis = self.loader.loadModel('zup-axis')
+        # self.axis.reparentTo(self.render)
+        # self.axis.setPos(0, 0, 0)
+        # self.axis.setScale(1)
 
         self.ball = Ball()
         self.ball.draw(self.render)
@@ -198,7 +205,7 @@ class My3DApp(ShowBase):
         self.outer_sphere = create_sphere(
             self.render, (0, 0, 0), self.ball.sphere_radius, wireframe=True)
         self.setup_outer_sphere_material()
-
+        
         # Adjust the camera's position and orientation
         self.camera.set_pos(0, 0, 100)
         self.camera.look_at(self.outer_sphere)
@@ -219,13 +226,13 @@ class My3DApp(ShowBase):
         """Sets up the general lighting for the scene."""
         # Ambient light for base illumination
         ambient_light = AmbientLight("ambient_light")
-        ambient_light.set_color((0.6, 0.6, 0.6, 1))  # Less bright ambient light
+        ambient_light.set_color((0.2, 0.2, 0.2, 1))  # Less bright ambient light
         self.render.set_light(self.render.attach_new_node(ambient_light))
 
         # Directional light for shading
         dir_light = DirectionalLight("directional_light")
         # Reduced intensity to make it less bright
-        dir_light.set_color((0.4, 0.4, 0.4, 1))
+        dir_light.set_color((0.3, 0.3, 0.3, 1))
         dir_light_np = self.render.attach_new_node(dir_light)
         dir_light_np.set_pos(-5, -5, 10)
         dir_light_np.look_at(0, 0, 0)
@@ -233,9 +240,12 @@ class My3DApp(ShowBase):
 
         # Point light for localized illumination
         point_light = PointLight("point_light")
-        point_light.set_color((1.0, 1.0, 1.0, 1))  # Keep point light intensity
+        point_light.set_color((0.4, 0.4, 0.4, 0.8))  # Keep point light intensity
+        point_light.attenuation = (1,0,0)
+        point_light.set_shadow_caster(True)
+        self.render.set_shader_auto()
         point_light_np = self.render.attach_new_node(point_light)
-        point_light_np.set_pos(5, -10, 7)
+        point_light_np.set_pos(0, 0, 22.5)
         self.render.set_light(point_light_np)
 
 
@@ -256,29 +266,35 @@ class My3DApp(ShowBase):
         self.ball_spotlight_np.set_pos(self.ball.position[0], self.ball.position[1], self.ball.position[2] + 5)
         self.ball_spotlight_np.look_at(self.ball.render)
         self.render.set_light(self.ball_spotlight_np)
-
+        
     def update_dynamic_ball_light(self):
         """Update the ball's dynamic light position."""
-        self.ball_light_np.set_pos(self.ball.position[0], self.ball.position[1], self.ball.position[2] + 3)
-        self.ball_spotlight_np.set_pos(self.ball.position[0], self.ball.position[1], self.ball.position[2] + 5)
-        self.ball_spotlight_np.look_at(self.ball.render)
+        # self.ball_light_np.set_pos(self.ball.position[0], self.ball.position[1], self.ball.position[2] + 3)
+        # self.ball_spotlight_np.set_pos(self.ball.position[0], self.ball.position[1], self.ball.position[2] + 5)
+        # self.ball_spotlight_np.look_at(self.ball.render)
 
     def setup_outer_sphere_material(self):
         """Sets up the material for the outer sphere."""
         # Enable transparency with a more transparent sphere
         self.outer_sphere.set_transparency(TransparencyAttrib.MAlpha)
+        self.outer_sphere.set_depth_offset(1)
+        # Disable depth testing for transparency to make the wireframe visible from the back
+        self.outer_sphere.set_depth_write(True)  # Disable depth writing
+        self.outer_sphere.set_depth_test(False)   # Disable depth testing
 
         # Set the sphere's material to have a higher level of transparency
         material = Material()
-        material.set_shininess(100.0)  # Higher shininess for a reflective look
-        material.set_emission((0.1, 0.2, 0.4, 0.5))  # Subtle glow effect
+        material.set_shininess(50.0)  # Higher shininess for a reflective look
+        material.set_emission((0.2, 0.2, 0.4, 0.5))  # Subtle glow effect
         self.outer_sphere.set_material(material)
 
         # Adjust alpha and color for more transparency
-        self.outer_sphere.set_color(0.8, 0.9, 1.0, 0)  # Make it more transparent
+        self.outer_sphere.set_color(0.8, 0.9, 1.0, 0.1)  # Make it more transparent
+        self.outer_sphere.set_shader_auto()
 
         # Disable backface culling to allow inside visibility
         self.outer_sphere.set_two_sided(True)  # Render both sides of the sphere
+        
 
     def spinCameraTask(self, task):
         angleDegrees = task.time * 6.0
