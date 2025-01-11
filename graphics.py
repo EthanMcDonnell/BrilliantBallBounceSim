@@ -1,158 +1,180 @@
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-
-width, height = 800, 600
-
-
-def init_graphics():
-    # OpenGL initialization (no need to call glutMainLoop here)
-    glClearColor(0.1, 0.1, 0.1, 1.0)  # Set clear color for background
-    glEnable(GL_DEPTH_TEST)  # Enable depth testing
-    glEnable(GL_MULTISAMPLE)  # Enable anti-aliasing
-    glShadeModel(GL_SMOOTH)  # Smooth shading
-    gluPerspective(60, (width / height), 0.1, 50.0)  # Perspective view
-    glTranslatef(0.0, 0.0, -6.0)  # Set initial view
-
-    # Lighting setup
-    glEnable(GL_LIGHTING)
-    setup_lighting()
-
-    glEnable(GL_POLYGON_SMOOTH)
-    glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST)
+from math import pi, sin, cos
+from panda3d.core import *
+from direct.showbase.ShowBase import ShowBase
+from direct.task import Task
+from procedural3d import *
 
 
-def setup_lighting():
-    glEnable(GL_LIGHT0)
-    # Position of the light
-    glLightfv(GL_LIGHT0, GL_POSITION, [0.0, 10.0, 0.0, 0.0])
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.8, 0.8, 0.8, 1.0])  # Diffuse light
-    glLightfv(GL_LIGHT0, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])  # Specular light
-    # Increased ambient light for a brighter scene
-    glLightfv(GL_LIGHT0, GL_AMBIENT, [0.4, 0.4, 0.4, 1.0])
+def create_sphere(game_render, position, radius, wireframe=False):
+    # Create a small red sphere (diffuse red, specular white)
+    sphere = SphereMaker(
+        center=position,
+        radius=radius,
+        smooth=True,
+        thickness=.1,
+        inverted=False,
+        vertex_color=None,
+        has_uvs=True,
+    )
+    
+    sphere = game_render.attach_new_node(sphere.generate())
+    if wireframe:
+        sphere.set_render_mode_filled_wireframe((1., 1., 1., 1.))
+    return sphere
 
-    # Additional light source for better 3D lighting effect
-    glEnable(GL_LIGHT1)
-    # Light coming from the top-right
-    glLightfv(GL_LIGHT1, GL_POSITION, [10.0, 10.0, 10.0, 1.0])
-    # Diffuse light for more even lighting
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, [0.6, 0.6, 0.6, 1.0])
-    # Specular light for reflections
-    glLightfv(GL_LIGHT1, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
+    # def setup_lighting(self):
+    #     # Ambient light (for brighter scene)
+    #     ambient_light = AmbientLight('ambient_light')
+    #     ambient_light.set_color((0.4, 0.4, 0.4, 1.0))  # Light color
+    #     ambient_node = self.render.attach_new_node(ambient_light)
+    #     self.render.set_light(ambient_node)
 
-
-def draw_small_ball(position, radius):
-    glPushMatrix()
-    glTranslatef(position[0], position[1], position[2])
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, [1.0, 0.0, 0.0, 1.0])  # Red
-    glMaterialfv(GL_FRONT, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])  # White
-    glMaterialf(GL_FRONT, GL_SHININESS, 50)
-    quad = gluNewQuadric()
-    gluQuadricNormals(quad, GLU_SMOOTH)
-    gluSphere(quad, radius, 128, 128)
-    gluDeleteQuadric(quad)
-    glPopMatrix()
-
-
-def draw_glass_sphere(radius):
-    glPushMatrix()
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-    # Glass material properties (transparent blue)
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [
-                 0.6, 0.8, 1.0, 0.5])  # Transparent blue
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [
-                 0.8, 0.8, 0.8, 1.0])  # Reflective highlights
-    # High shininess for glass effect
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 90)
-
-    # Render the sphere with smooth shading and high segments
-    quad = gluNewQuadric()
-    gluQuadricNormals(quad, GLU_SMOOTH)
-    gluSphere(quad, radius, 128, 128)
-    gluDeleteQuadric(quad)
-
-    glDisable(GL_BLEND)
-    glPopMatrix()
+    #     # Directional light (from above)
+    #     directional_light = DirectionalLight('directional_light')
+    #     directional_light.set_color((0.8, 0.8, 0.8, 1.0))  # White light
+    #     directional_node = self.render.attach_new_node(directional_light)
+    #     directional_node.set_hpr(45, -45, 0)  # Angle the light
+    #     self.render.set_light(directional_node)
 
 
-def draw_selected_glass_sphere(radius):
-    glPushMatrix()
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    # def draw_small_ball(self, position, radius):
+    #     # Create a small red sphere (diffuse red, specular white)
+    #     sphere = SphereMaker(
+    #         center=(0., 0., -.7),
+    #         radius=2.,
+    #         segments={
+    #             "horizontal": 40,
+    #             "vertical": 10,
+    #             "bottom_cap": 3,
+    #             "top_cap": 3,
+    #             "slice_caps": 2
+    #         },
+    #         smooth=True,
+    #         bottom_clip=.1,
+    #         top_clip=.8,
+    #         slice=125.,
+    #         thickness=.2,
+    #         inverted=False,
+    #         vertex_color=None,
+    #         has_uvs=True,
+    #         tex_units={
+    #             "main": (6., 6.),
+    #             "inner_main": (6., 6.),
+    #             "bottom_cap": (6., 6.),
+    #             "top_cap": (6., 6.),
+    #             "inner_bottom_cap": (6., 6.),
+    #             "inner_top_cap": (6., 6.),
+    #             "slice_start_cap": (6., 6.),
+    #             "slice_end_cap": (6., 6.)
+    #         },
+    #         tex_offset={
+    #             "slice_start_cap": (.2, 0.)
+    #         },
+    #         tex_rotation={
+    #             "main": 20.,
+    #             "inner_main": -40.,
+    #             "bottom_cap": 160.,
+    #             "inner_bottom_cap": 160.,
+    #             "slice_start_cap": 90.,
+    #             "slice_end_cap": 60.
+    #         },
+    #         tex_scale={
+    #             "slice_end_cap": (1.5, 1.5)
+    #         }
+    #     )
 
-    # Glass material properties for selected state (transparent green)
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [
-                 0.0, 1.0, 0.0, 0.7])  # Transparent green to indicate selection
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [
-                 1.0, 1.0, 0.0, 1.0])  # Yellow highlights for selected effect
-    # High shininess for more reflection
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 100)
+    #     sphere = self.render.attach_new_node(sphere.generate())
+    #     sphere.set_x(-5.)
+    #     sphere.set_h(-150.)
+    #     sphere.set_scale(radius)
 
-    # Render the sphere with smooth shading and high segments
-    quad = gluNewQuadric()
-    gluQuadricNormals(quad, GLU_SMOOTH)
-    gluSphere(quad, radius, 128, 128)
-    gluDeleteQuadric(quad)
+    #     # Set materials (equivalent to OpenGL materials)
+    #     mat = Material()
+    #     mat.set_diffuse((1.0, 0.0, 0.0, 1.0))  # Red
+    #     mat.set_specular((1.0, 1.0, 1.0, 1.0))  # White
+    #     mat.set_shininess(50)
+    #     sphere.set_material(mat)
 
-    glDisable(GL_BLEND)
-    glPopMatrix()
+    #     sphere.reparent_to(self.render)
+        
+    
+    # def draw_glass_sphere(self, radius):
+    #     # Create a glass sphere with transparency
+    #     sphere = SphereMaker(
+    #         center=(0., 0., -.7),
+    #         radius=2.,
+    #         segments={
+    #             "horizontal": 40,
+    #             "vertical": 10,
+    #             "bottom_cap": 3,
+    #             "top_cap": 3,
+    #             "slice_caps": 2
+    #         },
+    #         smooth=True,
+    #         bottom_clip=.1,
+    #         top_clip=.8,
+    #         slice=125.,
+    #         thickness=.2,
+    #         inverted=False,
+    #         vertex_color=None,
+    #         has_uvs=True,
+    #         tex_units={
+    #             "main": (6., 6.),
+    #             "inner_main": (6., 6.),
+    #             "bottom_cap": (6., 6.),
+    #             "top_cap": (6., 6.),
+    #             "inner_bottom_cap": (6., 6.),
+    #             "inner_top_cap": (6., 6.),
+    #             "slice_start_cap": (6., 6.),
+    #             "slice_end_cap": (6., 6.)
+    #         },
+    #         tex_offset={
+    #             "slice_start_cap": (.2, 0.)
+    #         },
+    #         tex_rotation={
+    #             "main": 20.,
+    #             "inner_main": -40.,
+    #             "bottom_cap": 160.,
+    #             "inner_bottom_cap": 160.,
+    #             "slice_start_cap": 90.,
+    #             "slice_end_cap": 60.
+    #         },
+    #         tex_scale={
+    #             "slice_end_cap": (1.5, 1.5)
+    #         }
+    #     )
 
+    #     sphere = self.render.attach_new_node(sphere.generate())
+    #     sphere.set_x(-5.)
+    #     sphere.set_h(-150.)
+    #     sphere.set_scale(radius)
 
-def draw_grid(down_offset):
-    glPushMatrix()
-    glDisable(GL_LIGHTING)  # Disable lighting for the grid
-    glColor3f(0.3, 0.3, 0.3)  # Soft gray
-    grid_size = 30
-    grid_step = 1
-    glBegin(GL_LINES)
-    for x in range(-grid_size, grid_size + 1, grid_step):
-        glVertex3f(x, -down_offset, -grid_size)
-        glVertex3f(x, -down_offset, grid_size)
-    for z in range(-grid_size, grid_size + 1, grid_step):
-        glVertex3f(-grid_size, -down_offset, z)
-        glVertex3f(grid_size, -down_offset, z)
-    glEnd()
-    glEnable(GL_LIGHTING)  # Re-enable lighting after drawing the grid
-    glPopMatrix()
+    #     # Set materials (transparent blue)
+    #     mat = Material()
+    #     mat.set_diffuse((0.6, 0.8, 1.0, 0.5))  # Transparent blue
+    #     mat.set_specular((0.8, 0.8, 0.8, 1.0))  # Reflective highlights
+    #     mat.set_shininess(90)
+    #     sphere.set_material(mat)
 
+    #     sphere.reparent_to(self.render)
 
-def display():
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-    glLoadIdentity()
+    # def draw_grid(self):
+    #     return
+    #     # # Simple grid drawing for testing
+    #     # grid_size = 30
+    #     # grid_step = 1
+    #     # for x in range(-grid_size, grid_size + 1, grid_step):
+    #     #     self.render_line(Point3(x, -1, -grid_size),
+    #     #                      Point3(x, -1, grid_size))
+    #     # for z in range(-grid_size, grid_size + 1, grid_step):
+    #     #     self.render_line(Point3(-grid_size, -1, z),
+    #     #                      Point3(grid_size, -1, z))
 
-    # Draw the grid and spheres
-    draw_grid(0)
+    # def render_line(self, start, end):
+    #     return
+    #     # Simple line rendering
+    #     line = self.loader.load_model('models/empty')
+    #     line.set_pos(start)
+    #     line.set_scale(end - start)
+    #     line.reparent_to(self.render)
 
-    # Draw the smaller ball
-    draw_small_ball([0, 0, 0], 0.5)
-
-    # Draw the glass sphere
-    draw_glass_sphere(1.0)
-
-    # Optionally, draw the selected glass sphere
-    draw_selected_glass_sphere(1.0)
-
-    glutSwapBuffers()
-
-
-def reshape(width, height):
-    glViewport(0, 0, width, height)
-    gluPerspective(60, (width / height), 0.1, 50.0)
-    glTranslatef(0.0, 0.0, -6.0)
-
-
-def main():
-    glutInit(sys.argv)
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
-    glutInitWindowSize(width, height)
-    glutCreateWindow("3D Scene")
-    init_graphics()
-    glutDisplayFunc(display)
-    glutReshapeFunc(reshape)
-    glutMainLoop()
-
-
-if __name__ == "__main__":
-    main()
