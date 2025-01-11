@@ -7,7 +7,7 @@ import yt_dlp
 import os
 import time
 from graphics import *
-
+import random
 from yt_dlp import YoutubeDL
 
 
@@ -39,8 +39,8 @@ mixer.init()
 
 # Load the song at the beginning
 song = mixer.music.load("song.mp3")
-sound = mixer.Sound("jump.wav")
-sound.set_volume(0.05)
+sound = mixer.Sound("angelic-ding.mp3")
+sound.set_volume(0.01)
 
 # Global variable to track the song's position
 song_position = 0  # This will store the current position in the song in seconds
@@ -50,62 +50,97 @@ pygame.display.set_mode((width, height), DOUBLEBUF | OPENGL)
 
 init_graphics()
 
+
 class Ball:
     def __init__(self):
-        self.position = np.array([0.0, 0.0, 0.0])
+        self.position = np.array([random.random(), random.random(), random.random()])
         self.velocity = np.array([0.10, -0.10, 0.10])
         self.gravity = np.array([0.0, -0.005, 0.0])
-        self.radius = 0.5
+        self.radius = 0.2
         self.sphere_radius = 3
         self.song_position = 0  # Track current position in the song
-        self.last_play_time = 999999
-        self.play_length = 0.3
+        self.last_play_time = 0
+        self.play_length = 0.2
+        self.volume_interval = 0.1
         self.curr_play_time = 0
+        self.music_playing = False
+        self.pause_over_start = False
+        self.is_fading_in = False
+        self.is_fading_out = False
+
 
     def play_song_segment(self):
-        """Play a segment of the song for 1 second on each bounce."""
-        current_time = time.time()
-        if not pygame.mixer.music.get_busy():
-            print("START MUSIC")
-            pygame.mixer.Sound.play(sound)
-            pygame.mixer.music.play(loops=0, start=self.song_position)
-            pygame.mixer.music.set_volume(0)
+        """Play a segment of the song on each bounce."""
+        current_time = time.perf_counter()
+        print("HIT w/ SOUND")
+        pygame.mixer.Sound.play(sound)
+
+        # Check if the song should resume or start
+        if not self.music_playing:
+            if self.pause_over_start:
+                pygame.mixer.music.unpause()
+            else:
+                pygame.mixer.music.play(loops=0, start=self.song_position)
+            pygame.mixer.music.set_volume(0)  # Start with zero volume
+            self.music_playing = True
+            self.is_fading_in = True
+            self.is_fading_out = False
 
         self.last_play_time = current_time
-    
-    def update_song(self):
-        current_time = time.time()
 
-        if pygame.mixer.music.get_busy():
-            if pygame.mixer.music.get_volume() < 1:
-                pygame.mixer.music.set_volume(pygame.mixer.music.get_volume() + 0.333)
-            
-            if current_time - self.last_play_time >= self.play_length:  # 1 second has passed
-                # Play 1 second of the song
-                current_pos = pygame.mixer.music.get_pos() / 1000.0
-                self.song_position += current_pos
-                pygame.mixer.music.fadeout(25)
-            
+
+    def update_song(self):
+        current_time = time.perf_counter()
+
+        if self.music_playing and pygame.mixer.music.get_busy():
+            # Gradually increase the volume for fade-in
+            if self.is_fading_in:
+                new_volume = pygame.mixer.music.get_volume() + self.volume_interval
+                if new_volume >= 1.0:  # Stop fading in when max volume is reached
+                    new_volume = 1.0
+                    self.is_fading_in = False
+                pygame.mixer.music.set_volume(new_volume)
+
+            # Check if the play length has been exceeded
+            if (current_time - self.last_play_time) >= self.play_length:
+                self.is_fading_out = True
+
+            # Gradually decrease the volume for fade-out
+            if self.is_fading_out:
+                new_volume = pygame.mixer.music.get_volume() - self.volume_interval
+                if new_volume <= 0.0:  # Stop fading out when volume reaches zero
+                    new_volume = 0.0
+                    self.is_fading_out = False
+                    self.music_playing = False
+                    self.song_position += pygame.mixer.music.get_pos() / 1000.0
+                    pygame.mixer.music.pause()  # Pause instead of stopping
+                    self.pause_over_start = True  # Indicate pause state
+                pygame.mixer.music.set_volume(new_volume)
+
+                    
+                
+
     def update(self):
         self.velocity += self.gravity
         self.position += self.velocity
         self.update_song()
+
         # Check for collision with the wall (sphere boundary)
         if np.linalg.norm(self.position) + self.radius > self.sphere_radius:
             normal = self.position / np.linalg.norm(self.position)
-            penetration = np.linalg.norm(self.position) + self.radius - self.sphere_radius 
+            penetration = np.linalg.norm(
+                self.position) + self.radius - self.sphere_radius
             self.position -= penetration * normal
             self.velocity -= 2 * np.dot(self.velocity, normal) * normal
-            self.song_position += self.play_length
             self.play_song_segment()
-    
+
     def draw(self):
         draw_small_ball(self.position, self.radius)
+
         
 
 # Initialize ball
 ball = Ball()
-
 clock = pygame.time.Clock()
 
 # Camera parameters
